@@ -6,12 +6,14 @@ TOKENS = {
         "surface": "#fcfcfb", "text": "#0b0b0b", "text2": "#52514e", "muted": "#898781",
         "grid": "#e1e0d9", "axis": "#c3c2b7",
         "series1": "#2a78d6", "series2": "#eb6834",          # advised, drive-at-limit
+        "series3": "#1baf7a", "series4": "#eda100",          # slots 3-4; below 3:1 on light: always direct-labelled
         "band_fill": "rgba(42,120,214,0.14)",
     },
     "dark": {
         "surface": "#1a1a19", "text": "#f0efec", "text2": "#c3c2b7", "muted": "#898781",
         "grid": "#2c2c2a", "axis": "#383835",
         "series1": "#3987e5", "series2": "#d95926",
+        "series3": "#199e70", "series4": "#c98500",
         "band_fill": "rgba(57,135,229,0.20)",
     },
 }
