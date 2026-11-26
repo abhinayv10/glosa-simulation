@@ -1,4 +1,6 @@
-# Green-Wave Speed Advisory & Signal-Aware Navigation
+# GLOSA Simulation: Green-Wave Speed Advisory & Signal-Aware Navigation
+
+*Formerly GreenWave. GLOSA stands for Green Light Optimal Speed Advisory. All results below come from SUMO simulation, not real vehicles.*
 
 Computes robust speed *bands* that let a vehicle cross successive signals on green, compares routes by
 signal-aware cost, and evaluates it all in SUMO, first on synthetic corridors (L2), then on a real one (L3).
@@ -31,11 +33,18 @@ SUMO comes from PyPI (`eclipse-sumo`); no system install or `SUMO_HOME` needed.
 .\.venv\Scripts\python.exe scripts\m4_probe_inference.py      # timing from probes: accuracy + trips
 ```
 
+## Run the M5 evaluation matrix
+```powershell
+.\.venv\Scripts\python.exe scripts\m5_matrix.py --seeds 5 --workers 12   # 220 SUMO runs, ~13 min; resumes if stopped
+```
+
 ## Run the M1 experiment and dashboard
 ```powershell
 .\.venv\Scripts\python.exe scripts\m1_compare.py        # SUMO: 51 advised + 51 unadvised test vehicles
 .\.venv\Scripts\streamlit.exe run dashboard\app.py
 ```
+The dashboard has one page per question: evaluation matrix (M5), single trip (M1), robustness (M2),
+route choice & energy (M3), timing from probes (M4). It reads `results/`; run the matching script first.
 
 ## Results so far
 All results use 51 test departures, one every 59 s, so each meets the 90 s signal cycle at a different phase
@@ -155,6 +164,24 @@ samples. Folding them over candidate cycle lengths recovers the cycle, then each
   cycle's start is harder. 10% probes match the logs on stops at +2% travel time; 5% still removes most
   stops (0.22 vs 1.59 at the limit), but trips are 30 s slower.
 
+**M5 (evaluation matrix, ADR-0016):** one dial at a time around the deployed configuration, 5 seeds ×
+51 departures per point, each advised trip paired with a drive-at-limit trip on the same traffic.
+
+| Deployed configuration vs limit | Stops | Travel time | Fuel | Broken promises |
+|---|---|---|---|---|
+| Fixed-time | 1.89 → 0.55 (−71%) | +4.4% | −2.9% | 0 |
+| Actuated | 1.50 → 0.26 (−83%) | +4.7% | −1.9% | 0 |
+
+- **The planning horizon of 4 is not the best; 3 is.** Stops 0.55 → 0.28 (fixed) and 0.26 → 0.18
+  (actuated) at the same travel time and fuel, and horizon 8 is worse still (0.89). The planner gives each candidate one constant speed through every signal in its horizon, so with a long horizon it
+  plans a stop to stay in sync with signals that it would re-plan for anyway. Default left at 4 for now
+  (M1–M4 report at 4); see the open item below.
+- **Compliance matters most:** drivers who apply half the advised slow-down get ~40% of the benefit; a
+  quarter gives almost nothing on the actuated corridor.
+- **The realistic driver** keeps −50% / −71% of stops and saves the most fuel (−6%), at +5.5% travel time.
+- **More traffic, less benefit:** stop reduction −88% → −46% (fixed) from 0.6× to 1.4× demand; fuel saving
+  fades to zero. p = 0.5 would give slightly fewer stops than 0.85 with no broken promises in simulation.
+
 ## Layout
 | Path | Role |
 |---|---|
@@ -170,8 +197,9 @@ samples. Folding them over candidate cycle lengths recovers the cycle, then each
 | `greenwave/energy.py` | Fuel (ICE) and battery (EV) models, matched to SUMO (`scripts/m3_energy_calibration.py`) |
 | `greenwave/routing.py` | Signal-aware route cost: the advisory controller rolled out in the planner model |
 | `greenwave/advisory.py` | Turns plans into advice, decides when to re-plan |
-| `greenwave/viz/` | Plotly charts (time-space, speed-vs-cost, stops distribution) |
-| `dashboard/` | Streamlit app |
+| `greenwave/evaluation.py` | M5 evaluation matrix: cells, worker runner, paired effects with bootstrap CIs |
+| `greenwave/viz/` | Plotly charts (time-space, speed-vs-cost, sweeps, Pareto, condition bars, probe accuracy) |
+| `dashboard/` | Streamlit app: `app.py` (navigation), `views/` (one page per milestone question) |
 | `scripts/` | Experiments |
 | `docs/decisions/` | Architecture Decision Records: why every major choice was made |
 | `tests/` | Includes the SUMO-vs-model signal consistency test |
@@ -189,5 +217,8 @@ samples. Folding them over candidate cycle lengths recovers the cycle, then each
 - [x] **M4** Signal timing inferred from probe trajectories (ADR-0015)
   - open: real GPS noise and irregular reporting, time-of-day plan changes, probe-only queue estimation
     (all to test on Lankershim in M6)
-- [ ] **M5** Evaluation matrix + Streamlit dashboard
+- [x] **M5** Evaluation matrix + Streamlit dashboard (ADR-0016)
+  - done: dashboard pages for M2–M4 (Robustness, Route choice & energy, Timing from probes)
+  - open: the horizon finding: set the default to 3 and re-run M1–M4, or make the planner re-plan-aware
+    (a speed per segment, chosen again at each signal); interactions between dials are not measured
 - [ ] **M6** L3: NGSIM Lankershim Blvd (ADR-0004)
