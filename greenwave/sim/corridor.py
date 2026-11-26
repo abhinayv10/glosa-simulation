@@ -14,7 +14,7 @@ from __future__ import annotations
 import math
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import sumolib
@@ -329,9 +329,23 @@ def eastbound_stop_lines(sc: Scenario, net_path: Path) -> list[tuple[str, float]
     return eastbound(sc, net_path).stop_lines()
 
 
-def build(scenario_path: str | Path, out_dir: str | Path | None = None) -> Path:
+def scale_demand(sc: Scenario, k: float) -> Scenario:
+    """The same scenario with every background flow (main road and cross streets) multiplied by k (M5)."""
+    d = dict(sc.demand)
+    for key in ("main_eb", "main_wb", "cross_each"):
+        if key in d:
+            d[key] = d[key] * k
+    if "cross_profile" in d:
+        d["cross_profile"] = [[b, e, vph * k] for b, e, vph in d["cross_profile"]]
+    return replace(sc, demand=d)
+
+
+def build(scenario_path: str | Path, out_dir: str | Path | None = None, demand_scale: float = 1.0) -> Path:
+    """Write the SUMO files for a scenario. demand_scale multiplies all background flows (M5 sweep)."""
     sc = load_scenario(scenario_path)
-    out = Path(out_dir) if out_dir else Path("build") / sc.name
+    if demand_scale != 1.0:
+        sc = scale_demand(sc, demand_scale)
+    out =Path(out_dir) if out_dir else Path("build") / sc.name
     out.mkdir(parents=True, exist_ok=True)
     write_plain_xml(sc, out)
     net = run_netconvert(out)
